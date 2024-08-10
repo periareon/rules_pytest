@@ -1,0 +1,9 @@
+"""UebelAndre/rules_pytest"""
+
+module(
+    name = "rules_pytest",
+    version = "0.0.1",
+)
+
+bazel_dep(name = "rules_python", version = "0.34.0")
+bazel_dep(name = "rules_req_compile", version = "1.0.0rc23")

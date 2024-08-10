@@ -1,1 +1,7 @@
 # Git ignore patterns
+
+/bazel-*
+user.bazelrc
+
+/.venv*
+/venv*

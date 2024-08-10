@@ -1,0 +1,12 @@
+# {version}
+
+```python
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+http_archive(
+    name = "rules_pytest",
+    sha256 = "{sha256}",
+    urls = ["https://github.com/UebelAndre/rules_pytest/releases/download/{version}/rules_pytest-v{version}.tar.gz"],
+)
+```
+
+Additional documentation can be found at: https://github.com/UebelAndre/rules_pytest
