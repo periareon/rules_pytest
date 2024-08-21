@@ -182,6 +182,7 @@ def py_pytest_test(
         deps = runner_deps + kwargs.pop("deps", []),
         data = runner_data + kwargs.pop("data", []),
         args = runner_args + kwargs.pop("args", []),
+        tags = tags,
         legacy_create_init = 0,
         **kwargs
     )
