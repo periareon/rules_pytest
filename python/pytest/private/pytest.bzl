@@ -121,12 +121,6 @@ def py_pytest_test(
         tags (list, optional): Tags to set on the underlying `py_test` target.
         **kwargs: Keyword arguments to forward to the underlying `py_test` target.
     """
-    if kwargs.get("tests"):
-        fail("The `tests` attribute is deprecated, please update `{}:{}` to use `srcs`.".format(
-            native.package_name(),
-            name,
-        ))
-
     runner_data = [
         pytest_config,
         coverage_rc,
