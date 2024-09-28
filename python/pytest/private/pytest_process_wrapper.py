@@ -269,15 +269,19 @@ def main() -> None:
     parsed_args = parse_args(load_args_file())
 
     temp_dir = Path(os.environ["TEST_TMPDIR"])
+    home = temp_dir / "home"
+    home.mkdir(exist_ok=True, parents=True)
+    temp = temp_dir / "tmp"
+    temp.mkdir(exist_ok=True, parents=True)
 
     child_env = dict(os.environ)
     child_env.update(
         {
-            "HOME": str(temp_dir / "home"),
-            "TEMP": str(temp_dir / "tmp"),
-            "TMP": str(temp_dir / "tmp"),
-            "TMPDIR": str(temp_dir / "tmp"),
-            "USERPROFILE": str(temp_dir / "home"),
+            "HOME": str(home),
+            "TEMP": str(temp),
+            "TMP": str(temp),
+            "TMPDIR": str(temp),
+            "USERPROFILE": str(home),
         }
     )
     # Default to a slightly less claustrophobic column width.
