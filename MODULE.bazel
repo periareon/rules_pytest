@@ -1,4 +1,4 @@
-"""UebelAndre/rules_pytest"""
+"""periareon/rules_pytest"""
 
 module(
     name = "rules_pytest",
