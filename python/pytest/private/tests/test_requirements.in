@@ -1,0 +1,8 @@
+# Python requirements for rules_pytest tests
+
+-r ../../requirements.in
+
+pylint
+mypy
+isort
+black

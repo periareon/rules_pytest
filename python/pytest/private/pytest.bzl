@@ -1,28 +1,23 @@
 """Pytest rules for Bazel"""
 
-load("@rules_python//python:defs.bzl", "PyInfo", "py_library", "py_test")
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+load("@rules_python//python:defs.bzl", "PyInfo", "py_library")
+load("@rules_venv//python/venv:defs.bzl", "py_venv_common")
 
-PYTEST_TARGET = Label("//python/pytest:current_py_pytest_toolchain")
-
-PY_PYTEST_TEST_ARGS_FILE = "PY_PYTEST_TEST_ARGS_FILE"
+_PY_PYTEST_TEST_ARGS_FILE = "PY_PYTEST_TEST_ARGS_FILE"
 
 test_configs = struct(
     coverage_rc = Label("//python/pytest:coverage_rc"),
     pytest_config = Label("//python/pytest:config"),
 )
 
-_EXTRA_ARGS_MANIFEST = Label("//python/pytest:extra_args")
-
 def _is_pytest_test(src):
     basename = src.basename
 
-    if basename.startswith("test_"):
-        return True
+    if basename == "__init__.py":
+        return False
 
-    if basename.endswith("_test.py"):
-        return True
-
-    return False
+    return True
 
 def _rlocationpath(file, workspace_name):
     if file.short_path.startswith("../"):
@@ -30,156 +25,231 @@ def _rlocationpath(file, workspace_name):
 
     return "{}/{}".format(workspace_name, file.short_path)
 
-def _pytest_tests_manifest_impl(ctx):
-    output = ctx.actions.declare_file(ctx.label.name)
-
-    test_srcs = sorted([
-        _rlocationpath(src, ctx.workspace_name)
-        for src in ctx.files.srcs
-        if _is_pytest_test(src)
-    ])
-
-    ctx.actions.write(
-        output = output,
-        content = "\n".join(test_srcs),
-    )
-
-    return DefaultInfo(
-        files = depset([output]),
-        runfiles = ctx.runfiles(files = [output]),
-    )
-
-_pytest_tests_manifest = rule(
-    doc = "A rule for collecting files to test when running pytest",
-    implementation = _pytest_tests_manifest_impl,
-    attrs = {
-        "srcs": attr.label_list(
-            doc = "A list of python source files",
-            allow_files = [".py"],
-            mandatory = True,
-        ),
-    },
-)
-
-def py_pytest_test(
-        name,
-        srcs,
-        coverage_rc = test_configs.coverage_rc,
-        pytest_config = test_configs.pytest_config,
-        numprocesses = None,
-        tags = [],
-        **kwargs):
-    """A rule which runs python tests using [pytest][pt] as the [py_test][bpt] test runner.
-
-    This rule also supports a build setting for globally applying extra flags to test invocations.
-    Users can add something similar to the following to their `.bazelrc` files:
-
-    ```text
-    build --//python/pytest:extra_args=--color=yes,-vv
-    ```
-
-    The example above will add `--colors=yes` and `-vv` arguments to the end of the pytest invocation.
-
-    Tips:
-
-    - It's common for tests to have some utility code that does not live in a test source file.
-    To account for this. A `py_library` can be created that contains only these sources which are then
-    passed to `py_pytest_test` via `deps`.
-
-    ```python
-    load("@rules_python//python:defs.bzl", "py_library")
-    load("@rules_pytest//python/pytest:defs.bzl", "PYTEST_TARGET", "py_pytest_test")
-
-    py_library(
-        name = "test_utils",
-        srcs = [
-            "tests/__init__.py",
-            "tests/conftest.py",
-        ],
-        deps = [PYTEST_TARGET],
-        testonly = True,
-    )
-
-    py_pytest_test(
-        name = "test",
-        srcs = ["tests/example_test.py"],
-        deps = [":test_utils"],
-    )
-    ```
-
-    [pt]: https://docs.pytest.org/en/latest/
-    [bpt]: https://docs.bazel.build/versions/master/be/python.html#py_test
-    [ptx]: https://pypi.org/project/pytest-xdist/
-
-    Args:
-        name (str): The name for the current target.
-        srcs (list): An explicit list of source files to test.
-        coverage_rc (Label, optional): The pytest-cov configuration file to use
-        pytest_config (Label, optional): The pytest configuration file to use
-        numprocesses (int, optional): If set the [pytest-xdist][ptx] argument
-            `--numprocesses` (`-n`) will be passed to the test.
-        tags (list, optional): Tags to set on the underlying `py_test` target.
-        **kwargs: Keyword arguments to forward to the underlying `py_test` target.
-    """
-    runner_data = [
-        pytest_config,
-        coverage_rc,
-        _EXTRA_ARGS_MANIFEST,
-    ]
-
+def _py_pytest_test_impl(ctx):
     # Gather args for the runner
-    runner_args = [
-        "--cov-config=$(rlocationpath {})".format(coverage_rc),
-        "--pytest-config=$(rlocationpath {})".format(pytest_config),
-        "--extra-args-manifest=$(rlocationpath {})".format(_EXTRA_ARGS_MANIFEST),
-    ]
+    runner_args = ctx.actions.args()
+    runner_args.set_param_file_format("multiline")
+    runner_args.add("--cov-config={}".format(_rlocationpath(ctx.file.coverage_rc, ctx.workspace_name)))
+    runner_args.add("--pytest-config={}".format(_rlocationpath(ctx.file.config, ctx.workspace_name)))
 
-    tests_manifest_name = name + ".pytest_tests_manifest"
-    _pytest_tests_manifest(
-        name = tests_manifest_name,
-        srcs = srcs,
-        tags = ["manual"],
-        testonly = True,
-    )
-    runner_args.append(
-        "--tests-manifest=$(rlocationpath {})".format(tests_manifest_name),
-    )
-    runner_data.append(tests_manifest_name)
+    workspace_name = ctx.workspace_name
 
-    # Create an unfrozen list.
-    tags = tags[:] if tags else []
+    def _src_map(file):
+        if not _is_pytest_test(file):
+            return None
+
+        return _rlocationpath(file, workspace_name)
+
+    # Add the test sources.
+    runner_args.add_all(
+        ctx.files.srcs,
+        map_each = _src_map,
+        format_each = "--src=%s",
+        allow_closure = True,
+    )
+
+    exec_requirements = {}
 
     # Optionally enable multi-threading
-    if numprocesses != None:
-        runner_args.append("--numprocesses={}".format(numprocesses))
-        cpu_tag = "cpu:{}".format(numprocesses)
-        if cpu_tag not in tags:
-            tags.append(cpu_tag)
+    if ctx.attr.numprocesses > 0:
+        numprocesses = ctx.attr.numprocesses
+        runner_args.add("--numprocesses={}".format(numprocesses))
+        exec_requirements["resources:cpu:{}".format(numprocesses)] = str(numprocesses)
 
     # Separate runner args from other inputs
-    runner_args.append("--")
+    runner_args.add("--")
 
-    runner_deps = [
-        Label("//python/pytest:current_py_pytest_toolchain"),
-        Label("//python/pytest/private:runfiles_wrapper"),
+    runner_args.add_all(ctx.attr._extra_args[BuildSettingInfo].value)
+    for arg in ctx.attr._extra_args[BuildSettingInfo].value:
+        if arg.startswith(("--numprocesses=", "-n=")) or arg in ("--numprocesses", "-n"):
+            fail("`{}` is not an acceptable extra argument for pytest. Please remove it".format(arg))
+
+    for arg in ctx.attr.args:
+        runner_args.add(ctx.expand_location(arg, ctx.attr.data))
+
+    args_file = ctx.actions.declare_file("{}.pytest_args.txt".format(ctx.label.name))
+    ctx.actions.write(
+        output = args_file,
+        content = runner_args,
+    )
+
+    cfg = "target"
+    if not ctx.attr._incompatible_cfg_target_toolchain[BuildSettingInfo].value:
+        cfg = "exec"
+
+    venv_toolchain = py_venv_common.get_toolchain(ctx, cfg = cfg)
+
+    dep_info = py_venv_common.create_dep_info(
+        ctx = ctx,
+        deps = [ctx.attr._runner] + ctx.attr.deps,
+    )
+
+    py_info = py_venv_common.create_py_info(
+        ctx = ctx,
+        imports = [],
+        srcs = [ctx.file._runner_main] + ctx.files.srcs,
+        dep_info = dep_info,
+    )
+
+    executable, runfiles = py_venv_common.create_venv_entrypoint(
+        ctx = ctx,
+        venv_toolchain = venv_toolchain,
+        py_info = py_info,
+        main = ctx.file._runner_main,
+        runfiles = dep_info.runfiles,
+    )
+
+    runfiles = ctx.runfiles([
+        args_file,
+        ctx.file.config,
+        ctx.file.coverage_rc,
+    ] + ctx.files.data).merge(runfiles.merge(dep_info.runfiles))
+
+    env = {}
+    for key, value in ctx.attr.env.items():
+        env[key] = ctx.expand_location(value, ctx.attr.data)
+
+    return [
+        py_info,
+        DefaultInfo(
+            executable = executable,
+            runfiles = runfiles,
+        ),
+        testing.ExecutionInfo(
+            requirements = exec_requirements,
+        ),
+        RunEnvironmentInfo(
+            environment = env | {
+                _PY_PYTEST_TEST_ARGS_FILE: _rlocationpath(args_file, ctx.workspace_name),
+            },
+        ),
+        coverage_common.instrumented_files_info(
+            ctx,
+            source_attributes = ["srcs"],
+            dependency_attributes = ["deps", "data"],
+            extensions = ["py"],
+        ),
     ]
 
-    runner_main = Label("//python/pytest/private:process_wrapper.py")
+_COVERAGE_ATTR = {
+    # This *might* be a magic attribute to help C++ coverage work. There's no
+    # docs about this; see TestActionBuilder.java
+    "_collect_cc_coverage": attr.label(
+        default = "@bazel_tools//tools/test:collect_cc_coverage",
+        executable = True,
+        cfg = "exec",
+    ),
+    # This *might* be a magic attribute to help C++ coverage work. There's no
+    # docs about this; see TestActionBuilder.java
+    "_lcov_merger": attr.label(
+        default = configuration_field(fragment = "coverage", name = "output_generator"),
+        cfg = "exec",
+        executable = True,
+    ),
+}
 
-    if "main" in kwargs:
-        fail("The attribute `main` should not be used as it's replaced by a test runner")
+py_pytest_test = rule(
+    doc = """\
+A rule which runs python tests using [pytest][pt] as the [py_test][bpt] test runner.
 
-    py_test(
-        name = name,
-        srcs = [runner_main] + srcs,
-        main = runner_main,
-        deps = runner_deps + kwargs.pop("deps", []),
-        data = runner_data + kwargs.pop("data", []),
-        args = runner_args + kwargs.pop("args", []),
-        tags = tags,
-        legacy_create_init = 0,
-        **kwargs
-    )
+This rule also supports a build setting for globally applying extra flags to test invocations.
+Users can add something similar to the following to their `.bazelrc` files:
+
+```text
+build --@rules_pytest//python/pytest:extra_args=--color=yes,-vv
+```
+
+The example above will add `--colors=yes` and `-vv` arguments to the end of the pytest invocation.
+
+Tips:
+
+- It's common for tests to have some utility code that does not live in a test source file.
+To account for this. A `py_library` can be created that contains only these sources which are then
+passed to `py_pytest_test` via `deps`.
+
+```python
+load("@rules_python//python:defs.bzl", "py_library")
+load("@rules_pytest//python/pytest:defs.bzl", "py_pytest_test")
+
+py_library(
+    name = "test_utils",
+    srcs = [
+        "tests/__init__.py",
+        "tests/conftest.py",
+    ],
+    deps = ["@rules_pytest//python/pytest:current_py_pytest_toolchain"],
+    testonly = True,
+)
+
+py_pytest_test(
+    name = "test",
+    srcs = ["tests/example_test.py"],
+    deps = [":test_utils"],
+)
+```
+
+[pt]: https://docs.pytest.org/en/latest/
+[bpt]: https://docs.bazel.build/versions/master/be/python.html#py_test
+[ptx]: https://pypi.org/project/pytest-xdist/
+""",
+    implementation = _py_pytest_test_impl,
+    attrs = {
+        "config": attr.label(
+            doc = "The pytest configuration file to use.",
+            allow_single_file = True,
+            default = Label("//python/pytest:config"),
+        ),
+        "coverage_rc": attr.label(
+            doc = "The pytest-cov configuration file to use.",
+            allow_single_file = True,
+            default = Label("//python/pytest:coverage_rc"),
+        ),
+        "data": attr.label_list(
+            doc = "Files needed by this rule at runtime. May list file or rule targets. Generally allows any target.",
+            allow_files = True,
+        ),
+        "deps": attr.label_list(
+            doc = "The list of other libraries to be linked in to the binary target.",
+            providers = [PyInfo],
+        ),
+        "env": attr.string_dict(
+            doc = "Dictionary of strings; values are subject to `$(location)` and \"Make variable\" substitution",
+            default = {},
+        ),
+        "numprocesses": attr.int(
+            doc = (
+                "If set the [pytest-xdist](https://pypi.org/project/pytest-xdist/) " +
+                "argument `--numprocesses` (`-n`) will be passed to the test. Note that " +
+                "the a value 0 or less indicates this flag should not be passed."
+            ),
+            default = 0,
+        ),
+        "srcs": attr.label_list(
+            doc = "An explicit list of source files to test.",
+            allow_files = [".py"],
+        ),
+        "_extra_args": attr.label(
+            doc = "Additional global args to pass to pytest.",
+            default = Label("//python/pytest:extra_args"),
+        ),
+        "_incompatible_cfg_target_toolchain": attr.label(
+            default = Label("//python/pytest/settings:incompatible_cfg_target_toolchain"),
+        ),
+        "_runner": attr.label(
+            doc = "The process wrapper for running pytest.",
+            cfg = "exec",
+            default = Label("//python/pytest/private:pytest_process_wrapper"),
+        ),
+        "_runner_main": attr.label(
+            doc = "The main entrypoint for the pytest process.",
+            cfg = "exec",
+            allow_single_file = True,
+            default = Label("//python/pytest/private:pytest_process_wrapper.py"),
+        ),
+    } | _COVERAGE_ATTR | py_venv_common.create_venv_attrs(),
+    toolchains = [py_venv_common.TOOLCHAIN_TYPE],
+    test = True,
+)
 
 def _py_pytest_toolchain_impl(ctx):
     pytest_target = ctx.attr.pytest
@@ -246,8 +316,6 @@ def py_pytest_test_suite(
         tests,
         args = [],
         data = [],
-        coverage_rc = test_configs.coverage_rc,
-        pytest_config = test_configs.pytest_config,
         **kwargs):
     """Generates a [test_suite][ts] which groups various test targets for a set of python sources.
 
@@ -324,13 +392,17 @@ def py_pytest_test_suite(
         args (list, optional): Arguments for the underlying `py_pytest_test` targets.
         data (list, optional): A list of additional data for the test. This field would also include python
             files containing test helper functionality.
-        coverage_rc (Label, optional): The pytest-cov configuration file to use.
-        pytest_config (Label, optional): The pytest configuration file to use.
         **kwargs: Keyword arguments passed to the underlying `py_test` rule.
     """
 
     tests_targets = []
 
+    common_kwargs = {
+        "target_compatible_with": kwargs.get("target_compatible_with"),
+        "visibility": kwargs.get("visibility"),
+    }
+
+    tags = kwargs.get("tags", [])
     deps = kwargs.pop("deps", [])
     srcs = kwargs.pop("srcs", [])
     if srcs:
@@ -340,7 +412,9 @@ def py_pytest_test_suite(
             srcs = srcs,
             deps = deps,
             data = data,
-            tags = ["manual"],
+            testonly = True,
+            tags = depset(tags + ["manual"]).to_list(),
+            **common_kwargs
         )
         deps = [test_lib_name] + deps
 
@@ -353,8 +427,6 @@ def py_pytest_test_suite(
         test_name = src_name[:-3]
         py_pytest_test(
             name = test_name,
-            coverage_rc = coverage_rc,
-            pytest_config = pytest_config,
             args = args,
             srcs = [src],
             data = data,
@@ -364,14 +436,9 @@ def py_pytest_test_suite(
 
         tests_targets.append(test_name)
 
-    common_kwargs = {
-        "tags": kwargs.get("tags", []),
-        "target_compatible_with": kwargs.get("target_compatible_with"),
-        "visibility": kwargs.get("visibility"),
-    }
-
     native.test_suite(
         name = name,
         tests = tests_targets,
+        tags = tags,
         **common_kwargs
     )

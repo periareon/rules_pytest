@@ -39,5 +39,5 @@ def test_greeting_no_name() -> None:
 
 
 def test_custom_arg(custom_arg: str) -> None:
-    """Test that custom command line arguments are assigend to expected values"""
-    assert custom_arg == "Occupy Mars"
+    """Test that custom command line arguments are assigned to expected values"""
+    assert custom_arg == "La-Li-Lu-Le-Lo"

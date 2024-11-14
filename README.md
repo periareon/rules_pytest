@@ -31,6 +31,71 @@ A rule for exposing the current registered `py_pytest_toolchain`.
 | <a id="current_py_pytest_toolchain-name"></a>name |  A unique name for this target.   | <a href="https://bazel.build/concepts/labels#target-names">Name</a> | required |  |
 
 
+<a id="py_pytest_test"></a>
+
+## py_pytest_test
+
+<pre>
+py_pytest_test(<a href="#py_pytest_test-name">name</a>, <a href="#py_pytest_test-deps">deps</a>, <a href="#py_pytest_test-srcs">srcs</a>, <a href="#py_pytest_test-data">data</a>, <a href="#py_pytest_test-config">config</a>, <a href="#py_pytest_test-coverage_rc">coverage_rc</a>, <a href="#py_pytest_test-env">env</a>, <a href="#py_pytest_test-numprocesses">numprocesses</a>)
+</pre>
+
+A rule which runs python tests using [pytest][pt] as the [py_test][bpt] test runner.
+
+This rule also supports a build setting for globally applying extra flags to test invocations.
+Users can add something similar to the following to their `.bazelrc` files:
+
+```text
+build --@rules_pytest//python/pytest:extra_args=--color=yes,-vv
+```
+
+The example above will add `--colors=yes` and `-vv` arguments to the end of the pytest invocation.
+
+Tips:
+
+- It's common for tests to have some utility code that does not live in a test source file.
+To account for this. A `py_library` can be created that contains only these sources which are then
+passed to `py_pytest_test` via `deps`.
+
+```python
+load("@rules_python//python:defs.bzl", "py_library")
+load("@rules_pytest//python/pytest:defs.bzl", "py_pytest_test")
+
+py_library(
+    name = "test_utils",
+    srcs = [
+        "tests/__init__.py",
+        "tests/conftest.py",
+    ],
+    deps = ["@rules_pytest//python/pytest:current_py_pytest_toolchain"],
+    testonly = True,
+)
+
+py_pytest_test(
+    name = "test",
+    srcs = ["tests/example_test.py"],
+    deps = [":test_utils"],
+)
+```
+
+[pt]: https://docs.pytest.org/en/latest/
+[bpt]: https://docs.bazel.build/versions/master/be/python.html#py_test
+[ptx]: https://pypi.org/project/pytest-xdist/
+
+**ATTRIBUTES**
+
+
+| Name  | Description | Type | Mandatory | Default |
+| :------------- | :------------- | :------------- | :------------- | :------------- |
+| <a id="py_pytest_test-name"></a>name |  A unique name for this target.   | <a href="https://bazel.build/concepts/labels#target-names">Name</a> | required |  |
+| <a id="py_pytest_test-deps"></a>deps |  The list of other libraries to be linked in to the binary target.   | <a href="https://bazel.build/concepts/labels">List of labels</a> | optional |  `[]`  |
+| <a id="py_pytest_test-srcs"></a>srcs |  An explicit list of source files to test.   | <a href="https://bazel.build/concepts/labels">List of labels</a> | optional |  `[]`  |
+| <a id="py_pytest_test-data"></a>data |  Files needed by this rule at runtime. May list file or rule targets. Generally allows any target.   | <a href="https://bazel.build/concepts/labels">List of labels</a> | optional |  `[]`  |
+| <a id="py_pytest_test-config"></a>config |  The pytest configuration file to use.   | <a href="https://bazel.build/concepts/labels">Label</a> | optional |  `"@rules_pytest//python/pytest:config"`  |
+| <a id="py_pytest_test-coverage_rc"></a>coverage_rc |  The pytest-cov configuration file to use.   | <a href="https://bazel.build/concepts/labels">Label</a> | optional |  `"@rules_pytest//python/pytest:coverage_rc"`  |
+| <a id="py_pytest_test-env"></a>env |  Dictionary of strings; values are subject to `$(location)` and "Make variable" substitution   | <a href="https://bazel.build/rules/lib/dict">Dictionary: String -> String</a> | optional |  `{}`  |
+| <a id="py_pytest_test-numprocesses"></a>numprocesses |  If set the [pytest-xdist](https://pypi.org/project/pytest-xdist/) argument `--numprocesses` (`-n`) will be passed to the test. Note that the a value 0 or less indicates this flag should not be passed.   | Integer | optional |  `0`  |
+
+
 <a id="py_pytest_toolchain"></a>
 
 ## py_pytest_toolchain
@@ -50,77 +115,12 @@ A toolchain for the [pytest](https://python/pytest.readthedocs.io/en/stable/) fo
 | <a id="py_pytest_toolchain-pytest"></a>pytest |  The pytest `py_library` to use with the rules.   | <a href="https://bazel.build/concepts/labels">Label</a> | required |  |
 
 
-<a id="py_pytest_test"></a>
-
-## py_pytest_test
-
-<pre>
-py_pytest_test(<a href="#py_pytest_test-name">name</a>, <a href="#py_pytest_test-srcs">srcs</a>, <a href="#py_pytest_test-coverage_rc">coverage_rc</a>, <a href="#py_pytest_test-pytest_config">pytest_config</a>, <a href="#py_pytest_test-numprocesses">numprocesses</a>, <a href="#py_pytest_test-tags">tags</a>, <a href="#py_pytest_test-kwargs">kwargs</a>)
-</pre>
-
-A rule which runs python tests using [pytest][pt] as the [py_test][bpt] test runner.
-
-This rule also supports a build setting for globally applying extra flags to test invocations.
-Users can add something similar to the following to their `.bazelrc` files:
-
-```text
-build --//python/pytest:extra_args=--color=yes,-vv
-```
-
-The example above will add `--colors=yes` and `-vv` arguments to the end of the pytest invocation.
-
-Tips:
-
-- It's common for tests to have some utility code that does not live in a test source file.
-To account for this. A `py_library` can be created that contains only these sources which are then
-passed to `py_pytest_test` via `deps`.
-
-```python
-load("@rules_python//python:defs.bzl", "py_library")
-load("@rules_pytest//python/pytest:defs.bzl", "PYTEST_TARGET", "py_pytest_test")
-
-py_library(
-    name = "test_utils",
-    srcs = [
-        "tests/__init__.py",
-        "tests/conftest.py",
-    ],
-    deps = [PYTEST_TARGET],
-    testonly = True,
-)
-
-py_pytest_test(
-    name = "test",
-    srcs = ["tests/example_test.py"],
-    deps = [":test_utils"],
-)
-```
-
-[pt]: https://docs.pytest.org/en/latest/
-[bpt]: https://docs.bazel.build/versions/master/be/python.html#py_test
-[ptx]: https://pypi.org/project/pytest-xdist/
-
-
-**PARAMETERS**
-
-
-| Name  | Description | Default Value |
-| :------------- | :------------- | :------------- |
-| <a id="py_pytest_test-name"></a>name |  The name for the current target.   |  none |
-| <a id="py_pytest_test-srcs"></a>srcs |  An explicit list of source files to test.   |  none |
-| <a id="py_pytest_test-coverage_rc"></a>coverage_rc |  The pytest-cov configuration file to use   |  `Label("@rules_pytest//python/pytest:coverage_rc")` |
-| <a id="py_pytest_test-pytest_config"></a>pytest_config |  The pytest configuration file to use   |  `Label("@rules_pytest//python/pytest:config")` |
-| <a id="py_pytest_test-numprocesses"></a>numprocesses |  If set the [pytest-xdist][ptx] argument `--numprocesses` (`-n`) will be passed to the test.   |  `None` |
-| <a id="py_pytest_test-tags"></a>tags |  Tags to set on the underlying `py_test` target.   |  `[]` |
-| <a id="py_pytest_test-kwargs"></a>kwargs |  Keyword arguments to forward to the underlying `py_test` target.   |  none |
-
-
 <a id="py_pytest_test_suite"></a>
 
 ## py_pytest_test_suite
 
 <pre>
-py_pytest_test_suite(<a href="#py_pytest_test_suite-name">name</a>, <a href="#py_pytest_test_suite-tests">tests</a>, <a href="#py_pytest_test_suite-args">args</a>, <a href="#py_pytest_test_suite-data">data</a>, <a href="#py_pytest_test_suite-coverage_rc">coverage_rc</a>, <a href="#py_pytest_test_suite-pytest_config">pytest_config</a>, <a href="#py_pytest_test_suite-kwargs">kwargs</a>)
+py_pytest_test_suite(<a href="#py_pytest_test_suite-name">name</a>, <a href="#py_pytest_test_suite-tests">tests</a>, <a href="#py_pytest_test_suite-args">args</a>, <a href="#py_pytest_test_suite-data">data</a>, <a href="#py_pytest_test_suite-kwargs">kwargs</a>)
 </pre>
 
 Generates a [test_suite][ts] which groups various test targets for a set of python sources.
@@ -201,8 +201,6 @@ Additional Notes:
 | <a id="py_pytest_test_suite-tests"></a>tests |  A list of source files, typically `glob(["tests/**/*_test.py"])`, which are converted into test targets.   |  none |
 | <a id="py_pytest_test_suite-args"></a>args |  Arguments for the underlying `py_pytest_test` targets.   |  `[]` |
 | <a id="py_pytest_test_suite-data"></a>data |  A list of additional data for the test. This field would also include python files containing test helper functionality.   |  `[]` |
-| <a id="py_pytest_test_suite-coverage_rc"></a>coverage_rc |  The pytest-cov configuration file to use.   |  `Label("@rules_pytest//python/pytest:coverage_rc")` |
-| <a id="py_pytest_test_suite-pytest_config"></a>pytest_config |  The pytest configuration file to use.   |  `Label("@rules_pytest//python/pytest:config")` |
 | <a id="py_pytest_test_suite-kwargs"></a>kwargs |  Keyword arguments passed to the underlying `py_test` rule.   |  none |
 
 

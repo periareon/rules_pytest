@@ -1,4 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_test")
+load("@rules_req_compile//:defs.bzl", "py_reqs_compiler", "py_reqs_solution_test")
 
 py_test(
     name = "pytest_process_wrapper_test",
@@ -9,4 +10,42 @@ py_test(
         "@pytest_deps//:pytest_cov",
         "@pytest_deps//:pytest_xdist",
     ],
+)
+
+PLATFORMS = [
+    "linux",
+    "macos",
+    "windows",
+]
+
+filegroup(
+    name = "test_requirements_in",
+    srcs = ["test_requirements.in"],
+    data = ["//python/pytest:requirements.in"],
+)
+
+[
+    py_reqs_compiler(
+        name = "test_requirements.{}.update".format(platform),
+        requirements_in = "test_requirements_in",
+        requirements_txt = "test_requirements_{}.txt".format(platform),
+        target_compatible_with = ["@platforms//os:{}".format(platform)],
+    )
+    for platform in PLATFORMS
+]
+
+[
+    py_reqs_solution_test(
+        name = "test_requirements_{}_test".format(platform),
+        compiler = ":test_requirements.{}.update".format(platform),
+    )
+    for platform in PLATFORMS
+]
+
+alias(
+    name = "test_requirements.update",
+    actual = select({
+        "@platforms//os:{}".format(platform): ":test_requirements.{}.update".format(platform)
+        for platform in PLATFORMS
+    }),
 )

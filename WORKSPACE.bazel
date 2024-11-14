@@ -4,6 +4,16 @@ load("//python/pytest:repositories.bzl", "rules_pytest_dependencies")
 
 rules_pytest_dependencies()
 
+load("@rules_venv//python/venv:repositories.bzl", "rules_venv_dependencies", "venv_register_toolchains")
+
+rules_venv_dependencies()
+
+venv_register_toolchains()
+
+load("@rules_venv//python/venv:repositories_transitive.bzl", "rules_venv_transitive_deps")
+
+rules_venv_transitive_deps()
+
 load("//python/pytest:repositories_transitive_1.bzl", "rules_pytest_transitive_deps_1")
 
 rules_pytest_transitive_deps_1()

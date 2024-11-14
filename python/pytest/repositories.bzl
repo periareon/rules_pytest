@@ -16,7 +16,14 @@ def rules_pytest_dependencies():
 
     maybe(
         http_archive,
+        name = "rules_venv",
+        integrity = "sha256-Hb6raL/eMeTEkfbAbM2mBtoua4bcwBr5FwhvGrAMjow=",
+        urls = ["https://github.com/periareon/rules_venv/releases/download/0.0.7/rules_venv-0.0.7.tar.gz"],
+    )
+
+    maybe(
+        http_archive,
         name = "rules_req_compile",
-        sha256 = "934c221bec5c1862d91f760d17224e5b5662aa097d595cdd197af3089cd63817",
-        urls = ["https://github.com/sputt/req-compile/releases/download/1.0.0rc23/rules_req_compile-v1.0.0rc23.tar.gz"],
+        sha256 = "24e937f7e8a06b3c7072083c3a94a4e2ff3e7d2bf30fbb4fb723809ce82f5d58",
+        urls = ["https://github.com/periareon/req-compile/releases/download/1.0.0rc32/rules_req_compile-1.0.0rc32.tar.gz"],
     )

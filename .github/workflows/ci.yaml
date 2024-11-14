@@ -54,13 +54,15 @@ jobs:
         with:
           path: |
             ~/.cache/bazelisk
-            C:/bzl
+            D:/bzl
           key: ${{ runner.os }}-${{ env.cache-name }}
         if: startswith(runner.os, 'Windows')
 
       - name: Setup Bazelrc (Windows)
         run: |
-          echo "startup --output_user_root=C:/bzl" > ./user.bazelrc
+          echo "TEMP=$env:RUNNER_TEMP" >> "$env:GITHUB_ENV"
+          echo "TMP=$env:RUNNER_TEMP" >> "$env:GITHUB_ENV"
+          echo "startup --output_user_root=D:/bzl" > ./user.bazelrc
         if: startswith(runner.os, 'Windows')
       - name: Setup Bazelrc
         run: |
@@ -101,7 +103,7 @@ jobs:
           python -m pip install --upgrade pip setuptools
       - name: Install dependencies
         run: |
-          pip install -r python/pytest/requirements.linux.txt --user
+          pip install -r python/pytest/private/tests/test_requirements_linux.txt --user
       - name: Run mypy
         run: |
           python -m mypy python
@@ -114,4 +116,3 @@ jobs:
       - name: Run isort
         run: |
           python -m isort --check-only python
-
