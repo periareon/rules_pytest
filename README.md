@@ -36,7 +36,7 @@ A rule for exposing the current registered `py_pytest_toolchain`.
 ## py_pytest_test
 
 <pre>
-py_pytest_test(<a href="#py_pytest_test-name">name</a>, <a href="#py_pytest_test-deps">deps</a>, <a href="#py_pytest_test-srcs">srcs</a>, <a href="#py_pytest_test-data">data</a>, <a href="#py_pytest_test-config">config</a>, <a href="#py_pytest_test-coverage_rc">coverage_rc</a>, <a href="#py_pytest_test-env">env</a>, <a href="#py_pytest_test-numprocesses">numprocesses</a>)
+py_pytest_test(<a href="#py_pytest_test-name">name</a>, <a href="#py_pytest_test-deps">deps</a>, <a href="#py_pytest_test-srcs">srcs</a>, <a href="#py_pytest_test-data">data</a>, <a href="#py_pytest_test-config">config</a>, <a href="#py_pytest_test-coverage_rc">coverage_rc</a>, <a href="#py_pytest_test-env">env</a>, <a href="#py_pytest_test-env_inherit">env_inherit</a>, <a href="#py_pytest_test-numprocesses">numprocesses</a>)
 </pre>
 
 A rule which runs python tests using [pytest][pt] as the [py_test][bpt] test runner.
@@ -93,6 +93,7 @@ py_pytest_test(
 | <a id="py_pytest_test-config"></a>config |  The pytest configuration file to use.   | <a href="https://bazel.build/concepts/labels">Label</a> | optional |  `"@rules_pytest//python/pytest:config"`  |
 | <a id="py_pytest_test-coverage_rc"></a>coverage_rc |  The pytest-cov configuration file to use.   | <a href="https://bazel.build/concepts/labels">Label</a> | optional |  `"@rules_pytest//python/pytest:coverage_rc"`  |
 | <a id="py_pytest_test-env"></a>env |  Dictionary of strings; values are subject to `$(location)` and "Make variable" substitution   | <a href="https://bazel.build/rules/lib/dict">Dictionary: String -> String</a> | optional |  `{}`  |
+| <a id="py_pytest_test-env_inherit"></a>env_inherit |  Specifies additional environment variables to inherit from the external environment when the test is executed by `bazel test`.   | List of strings | optional |  `[]`  |
 | <a id="py_pytest_test-numprocesses"></a>numprocesses |  If set the [pytest-xdist](https://pypi.org/project/pytest-xdist/) argument `--numprocesses` (`-n`) will be passed to the test. Note that the a value 0 or less indicates this flag should not be passed.   | Integer | optional |  `0`  |
 
 

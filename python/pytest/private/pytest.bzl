@@ -11,6 +11,47 @@ test_configs = struct(
     pytest_config = Label("//python/pytest:config"),
 )
 
+def _create_run_environment_info(ctx, env, env_inherit, targets):
+    """Create an environment info provider
+
+    This macro performs location expansions.
+
+    Args:
+        ctx (ctx): The rule's context object.
+        env (dict): Environment variables to set.
+        env_inherit (list): Environment variables to inehrit from the host.
+        targets (List[Target]): Targets to use in location expansion.
+
+    Returns:
+        RunEnvironmentInfo: The provider.
+    """
+
+    known_variables = {}
+    for target in ctx.attr.toolchains:
+        if platform_common.TemplateVariableInfo in target:
+            variables = getattr(target[platform_common.TemplateVariableInfo], "variables", {})
+            known_variables.update(variables)
+
+    expanded_env = {}
+    for key, value in env.items():
+        expanded_env[key] = ctx.expand_make_variables(
+            key,
+            ctx.expand_location(value, targets),
+            known_variables,
+        )
+
+    workspace_name = ctx.label.workspace_name
+    if not workspace_name:
+        workspace_name = ctx.workspace_name
+
+    # Needed for bzlmod-aware runfiles resolution.
+    expanded_env["REPOSITORY_NAME"] = workspace_name
+
+    return RunEnvironmentInfo(
+        environment = expanded_env,
+        inherited_environment = env_inherit,
+    )
+
 def _is_pytest_test(src):
     basename = src.basename
 
@@ -105,10 +146,6 @@ def _py_pytest_test_impl(ctx):
         ctx.file.coverage_rc,
     ] + ctx.files.data).merge(runfiles.merge(dep_info.runfiles))
 
-    env = {}
-    for key, value in ctx.attr.env.items():
-        env[key] = ctx.expand_location(value, ctx.attr.data)
-
     return [
         py_info,
         DefaultInfo(
@@ -118,10 +155,13 @@ def _py_pytest_test_impl(ctx):
         testing.ExecutionInfo(
             requirements = exec_requirements,
         ),
-        RunEnvironmentInfo(
-            environment = env | {
+        _create_run_environment_info(
+            ctx,
+            env = ctx.attr.env | {
                 _PY_PYTEST_TEST_ARGS_FILE: _rlocationpath(args_file, ctx.workspace_name),
             },
+            env_inherit = ctx.attr.env_inherit,
+            targets = ctx.attr.data,
         ),
         coverage_common.instrumented_files_info(
             ctx,
@@ -215,6 +255,9 @@ py_pytest_test(
         "env": attr.string_dict(
             doc = "Dictionary of strings; values are subject to `$(location)` and \"Make variable\" substitution",
             default = {},
+        ),
+        "env_inherit": attr.string_list(
+            doc = "Specifies additional environment variables to inherit from the external environment when the test is executed by `bazel test`.",
         ),
         "numprocesses": attr.int(
             doc = (
