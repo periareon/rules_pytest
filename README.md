@@ -104,7 +104,7 @@ py_pytest_test(
 py_pytest_toolchain(<a href="#py_pytest_toolchain-name">name</a>, <a href="#py_pytest_toolchain-pytest">pytest</a>)
 </pre>
 
-A toolchain for the [pytest](https://python/pytest.readthedocs.io/en/stable/) formatter rules.
+A toolchain for the [pytest](https://python/pytest.readthedocs.io/en/stable/) rules.
 
 **ATTRIBUTES**
 
