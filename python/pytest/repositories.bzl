@@ -17,8 +17,8 @@ def rules_pytest_dependencies():
     maybe(
         http_archive,
         name = "rules_venv",
-        integrity = "sha256-Hb6raL/eMeTEkfbAbM2mBtoua4bcwBr5FwhvGrAMjow=",
-        urls = ["https://github.com/periareon/rules_venv/releases/download/0.0.7/rules_venv-0.0.7.tar.gz"],
+        integrity = "sha256-b5xOZLqWC9YIs5oFIyGwj6brEGdUEw6fiTiyEa9EO2k=",
+        urls = ["https://github.com/periareon/rules_venv/releases/download/0.0.8/rules_venv-0.0.8.tar.gz"],
     )
 
     maybe(
