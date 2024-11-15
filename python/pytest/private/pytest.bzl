@@ -273,7 +273,7 @@ def _py_pytest_toolchain_impl(ctx):
 
 py_pytest_toolchain = rule(
     implementation = _py_pytest_toolchain_impl,
-    doc = "A toolchain for the [pytest](https://python/pytest.readthedocs.io/en/stable/) formatter rules.",
+    doc = "A toolchain for the [pytest](https://python/pytest.readthedocs.io/en/stable/) rules.",
     attrs = {
         "pytest": attr.label(
             doc = "The pytest `py_library` to use with the rules.",
