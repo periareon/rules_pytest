@@ -2,7 +2,6 @@
 
 import argparse
 import configparser
-import json
 import os
 import subprocess
 import sys
@@ -13,7 +12,8 @@ import coverage
 from coverage.cmdline import main as coverage_main
 from python.runfiles import Runfiles
 
-RUNFILES: Optional[Runfiles] = Runfiles.Create()
+# Initialized in `main`.
+RUNFILES: Optional[Runfiles] = None
 
 
 CoverageSourceMap = Dict[Path, PurePosixPath]
@@ -24,7 +24,7 @@ https://docs.bazel.build/versions/main/be/make-variables.html#predefined_label_v
 """
 
 
-def bazel_runfile(arg: str) -> Path:
+def _bazel_runfile(arg: str) -> Path:
     """A wrapper for locating Bazel runfiles
 
     Args:
@@ -40,44 +40,11 @@ def bazel_runfile(arg: str) -> Path:
             " under Bazel?"
         )
 
-    rlocation = RUNFILES.Rlocation(arg)
+    rlocation = RUNFILES.Rlocation(arg, source_repo=os.environ["TEST_WORKSPACE"])
     if not rlocation:
         raise ValueError(f"Failed to find runfile for `{arg}`")
 
     return Path(rlocation)
-
-
-def _bazel_runfiles_manifest(arg: str) -> List[Path]:
-    """Reads a list of runfiles from a file of newline delimited paths
-
-    Args:
-        arg (str): The command line input to be parsed
-
-    Returns:
-        A list of runfiles
-    """
-    manifest = bazel_runfile(arg)
-
-    with manifest.open("r", encoding="utf-8") as fhd:
-        sources = [bazel_runfile(line.strip()) for line in fhd.readlines()]
-
-    return sources
-
-
-def _bazel_args_manifest(arg: str) -> List[str]:
-    """Read a file containing additional arguments for pytest.
-
-    Args:
-        arg: The command line input to be parsed
-
-    Returns:
-        A list of pytest arguments
-    """
-    manifest = bazel_runfile(arg)
-
-    with manifest.open("r", encoding="utf-8") as fhd:
-        data: List[str] = json.load(fhd)
-    return data
 
 
 def parse_args(args: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -87,34 +54,29 @@ def parse_args(args: Optional[Sequence[str]] = None) -> argparse.Namespace:
         args: An optional list of arguments to use for parsing. If unset, `sys.argv` is used.
 
     Returns:
-        argparse.Namespace: A struct of parsed arguments
+        A struct of parsed arguments
     """
     parser = argparse.ArgumentParser(prog="pytest_process_wrapper", usage=__doc__)
     parser.add_argument(
         "--cov-config",
         required=True,
-        type=bazel_runfile,
+        type=_bazel_runfile,
         help="Path to a coverage.py rc file.",
     )
     parser.add_argument(
         "--pytest-config",
         required=True,
-        type=bazel_runfile,
+        type=_bazel_runfile,
         help="Path to a pytest config file.",
     )
     parser.add_argument(
-        "--tests-manifest",
+        "--src",
         dest="sources",
-        type=_bazel_runfiles_manifest,
+        type=_bazel_runfile,
+        action="append",
+        default=[],
         required=True,
-        help="A file contining a list of sources to test",
-    )
-    parser.add_argument(
-        "--extra-args-manifest",
-        dest="extra_pytest_args",
-        type=_bazel_args_manifest,
-        required=True,
-        help="A file containing extra arugments for pytest.",
+        help="A list of source files to test.",
     )
     parser.add_argument(
         "-n",
@@ -188,7 +150,9 @@ def collect_coverage_sources(manifest: Path) -> CoverageSourceMap:
             continue
 
         rlocationpath = str(workspace / line)
-        src = RUNFILES.Rlocation(rlocationpath)
+        src = RUNFILES.Rlocation(
+            rlocationpath, source_repo=os.environ["TEST_WORKSPACE"]
+        )
         if not src:
             raise FileNotFoundError(f"Failed to find runfile {rlocationpath}")
         sources.update({Path(src): PurePosixPath(line)})
@@ -256,15 +220,17 @@ def load_args_file() -> Optional[List[str]]:
     """
     argv = None
     if "PY_PYTEST_TEST_ARGS_FILE" in os.environ:
-        args_file = bazel_runfile(os.environ["PY_PYTEST_TEST_ARGS_FILE"])
-        argv = args_file.read_text(encoding="utf-8").splitlines()
+        args_file = _bazel_runfile(os.environ["PY_PYTEST_TEST_ARGS_FILE"])
+        argv = args_file.read_text(encoding="utf-8").splitlines() + sys.argv[1:]
     return argv
 
 
-# pylint: disable=too-many-branches
-def main() -> None:
+def main() -> None:  # pylint: disable=too-many-branches,too-many-statements
     """Main execution."""
     patch_realpaths()
+
+    global RUNFILES  # pylint: disable=global-statement
+    RUNFILES = Runfiles.Create()
 
     parsed_args = parse_args(load_args_file())
 
@@ -324,20 +290,22 @@ def main() -> None:
             coverage_sources = collect_coverage_sources(coverage_manifest)
 
         # If no coverage sources are provided, then coverage is disabled.
-        if coverage_sources:
+        if not coverage_sources:
+            pytest_args.append("--no-cov")
+        else:
             cov_config_path = splice_coverage_config(
                 cov_config_path=cov_config_path,
                 coverage_sources=coverage_sources,
                 data_file=coverage_file,
             )
 
-        pytest_args.extend(
-            [
-                "--cov",
-                "--cov-config",
-                str(cov_config_path),
-            ]
-        )
+            pytest_args.extend(
+                [
+                    "--cov",
+                    "--cov-config",
+                    str(cov_config_path),
+                ]
+            )
 
     else:
         pytest_args.append("--no-cov")
@@ -353,7 +321,6 @@ def main() -> None:
     pytest_args.extend(["-c", str(parsed_args.pytest_config)])
     pytest_args.extend([str(src) for src in parsed_args.sources])
     pytest_args.extend(parsed_args.pytest_args)
-    pytest_args.extend(parsed_args.extra_pytest_args)
 
     try:
         result = subprocess.run(pytest_args, cwd=test_dir, env=child_env, check=False)

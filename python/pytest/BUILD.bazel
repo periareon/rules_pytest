@@ -1,5 +1,5 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
-load("//python/pytest/private:pytest_utils.bzl", "extra_pytest_args")
+load("@bazel_skylib//rules:common_settings.bzl", "string_list_flag")
 load(":defs.bzl", "current_py_pytest_toolchain")
 
 package(default_visibility = ["//visibility:public"])
@@ -24,7 +24,7 @@ label_flag(
     build_setting_default = ":coveragerc",
 )
 
-extra_pytest_args(
+string_list_flag(
     name = "extra_args",
     build_setting_default = [],
     visibility = ["//visibility:public"],

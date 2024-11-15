@@ -1,5 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_library")
-load("//python/pytest:defs.bzl", "PYTEST_TARGET", "py_pytest_test")
+load("//python/pytest:defs.bzl", "py_pytest_test")
 
 py_library(
     name = "lib",
@@ -16,7 +16,7 @@ py_library(
 py_library(
     name = "with_args_test_lib",
     srcs = ["tests/conftest.py"],
-    deps = [PYTEST_TARGET],
+    deps = ["@rules_pytest//python/pytest:current_py_pytest_toolchain"],
 )
 
 py_pytest_test(
@@ -28,7 +28,7 @@ py_pytest_test(
         "loadgroup",
         # Show show that custom flags are also passed
         "--custom_arg",
-        "Occupy Mars",
+        "La-Li-Lu-Le-Lo",
     ],
     numprocesses = 2,
     deps = [

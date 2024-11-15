@@ -21,17 +21,9 @@ class TestRunPytestArgParsing(unittest.TestCase):
         self.temp_dir = Path(tempfile.mkdtemp(dir=os.environ.get("TEST_TMPDIR", None)))
         self.temp_dir.mkdir(parents=True, exist_ok=True)
 
-        tests_manifest = self.temp_dir / WORKSPACE_NAME / "tests_manifest.txt"
-        tests_manifest.parent.mkdir(exist_ok=True, parents=True)
-        tests_manifest.write_text(
-            "ext_workspace_name/tmp/some_test.py", encoding="utf-8"
-        )
-
-        extra_args_manifest = self.temp_dir / WORKSPACE_NAME / "extra_args_manifest.txt"
-        extra_args_manifest.write_text("[]", encoding="utf-8")
-
-        self.tests_manifest = tests_manifest.relative_to(self.temp_dir)
-        self.extra_args_manifest = extra_args_manifest.relative_to(self.temp_dir)
+        test_src = self.temp_dir / WORKSPACE_NAME / "src.py"
+        test_src.parent.mkdir(exist_ok=True, parents=True)
+        test_src.write_text("", encoding="utf-8")
 
         return super().setUp()
 
@@ -41,16 +33,13 @@ class TestRunPytestArgParsing(unittest.TestCase):
 
     def test_normal(self) -> None:
         """Test parsing expected args"""
-        print(str(self.tests_manifest))
         args = [
             "--cov-config",
             "tmp/coveragerc",
             "--pytest-config",
             "tmp/pytest.toml",
-            "--tests-manifest",
-            str(self.tests_manifest),
-            "--extra-args-manifest",
-            str(self.extra_args_manifest),
+            "--src",
+            "tmp/src.py",
             "--",
             # Pytest args would go here
         ]
@@ -79,10 +68,8 @@ class TestRunPytestArgParsing(unittest.TestCase):
             "tmp/coveragerc",
             "--pytest-config",
             "tmp/pytest.toml",
-            "--tests-manifest",
-            str(self.tests_manifest),
-            "--extra-args-manifest",
-            str(self.extra_args_manifest),
+            "--src",
+            "tmp/src.py",
             # The pytest args delimiter is allowed to be missing
             # "--""
         ]
@@ -111,10 +98,8 @@ class TestRunPytestArgParsing(unittest.TestCase):
             "tmp/coveragerc",
             "--pytest-config",
             "tmp/pytest.toml",
-            "--tests-manifest",
-            str(self.tests_manifest),
-            "--extra-args-manifest",
-            str(self.extra_args_manifest),
+            "--src",
+            "tmp/src.py",
             "--",
         ]
 
@@ -150,10 +135,8 @@ class TestRunPytestArgParsing(unittest.TestCase):
             "tmp/coveragerc",
             "--pytest-config",
             "tmp/pytest.toml",
-            "--tests-manifest",
-            str(self.tests_manifest),
-            "--extra-args-manifest",
-            str(self.extra_args_manifest),
+            "--src",
+            "tmp/src.py",
             "--numprocesses",
             "4",
             "--",
@@ -185,10 +168,8 @@ class TestRunPytestArgParsing(unittest.TestCase):
             "tmp/coveragerc",
             "--pytest-config",
             "tmp/pytest.toml",
-            "--tests-manifest",
-            str(self.tests_manifest),
-            "--extra-args-manifest",
-            str(self.extra_args_manifest),
+            "--src",
+            "tmp/src.py",
             "--",
             "-n",
             "4",

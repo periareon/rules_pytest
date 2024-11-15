@@ -1,22 +1,5 @@
 """Utility rules for pytest rules and macros"""
 
-def _extra_pytest_args_impl(ctx):
-    output = ctx.actions.declare_file(ctx.label.name + ".txt")
-    ctx.actions.write(
-        output = output,
-        content = json.encode(ctx.build_setting_value),
-    )
-
-    return [DefaultInfo(
-        files = depset([output]),
-    )]
-
-extra_pytest_args = rule(
-    doc = "A rule for providing additional arguments to pytest",
-    implementation = _extra_pytest_args_impl,
-    build_setting = config.string_list(flag = True),
-)
-
 def _pytest_entrypoint_wrapper_impl(ctx):
     output = ctx.outputs.out
 

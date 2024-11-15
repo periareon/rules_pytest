@@ -12,9 +12,9 @@ on:
         default: "//python/pytest/3rdparty:requirements.update"
 
 jobs:
-  build:
+  compile:
     strategy:
-      fail-fast: false 
+      fail-fast: false
       matrix:
         platform: ["ubuntu-latest", "macos-latest", "windows-latest"]
 

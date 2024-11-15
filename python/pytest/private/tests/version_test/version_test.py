@@ -1,5 +1,6 @@
 """A suite of tests ensuring version strings are all in sync."""
 
+import os
 import re
 import unittest
 from pathlib import Path
@@ -17,7 +18,9 @@ def rlocation(runfiles: Runfiles, rlocationpath: str) -> Path:
     Returns:
         The requested runifle.
     """
-    runfile = runfiles.Rlocation(rlocationpath)
+    runfile = runfiles.Rlocation(
+        rlocationpath, source_repo=os.getenv("REPOSITORY_NAME")
+    )
     if not runfile:
         raise FileNotFoundError(f"Failed to find runfile: {rlocationpath}")
     path = Path(runfile)
