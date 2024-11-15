@@ -132,19 +132,24 @@ def _py_pytest_test_impl(ctx):
         dep_info = dep_info,
     )
 
+    direct_runfiles = ctx.runfiles(files = [
+        args_file,
+        ctx.file.config,
+        ctx.file.coverage_rc,
+    ] + ctx.files.srcs + ctx.files.data).merge_all([
+        dep_info.runfiles,
+    ] + [
+        target[DefaultInfo].default_runfiles
+        for target in ctx.attr.data
+    ])
+
     executable, runfiles = py_venv_common.create_venv_entrypoint(
         ctx = ctx,
         venv_toolchain = venv_toolchain,
         py_info = py_info,
         main = ctx.file._runner_main,
-        runfiles = dep_info.runfiles,
+        runfiles = direct_runfiles,
     )
-
-    runfiles = ctx.runfiles([
-        args_file,
-        ctx.file.config,
-        ctx.file.coverage_rc,
-    ] + ctx.files.data).merge(runfiles.merge(dep_info.runfiles))
 
     return [
         py_info,
